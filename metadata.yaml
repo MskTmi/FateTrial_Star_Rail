@@ -1,7 +1,7 @@
-name: FateTrial_Star_Rail
+name: astrbot_plugin_Star_Rail
 desc: 崩坏星穹铁道查询
 help: |
   - 指令格式：崩铁查询 <名称>
 version: v2.7
-author: FateTrial,Fridemn
-repo: https://github.com/FateTrial/FateTrial_Star_Rail
+author: FateTrial,Fridemn,MskTmi
+repo: https://github.com/MskTmi/astrbot_plugin_Star_Rail

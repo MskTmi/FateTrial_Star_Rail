@@ -6,7 +6,7 @@ from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Star, register
 from astrbot.api.message_components import Image, Plain
 
-@register("Star_Rail", "FateTrial", "崩坏星穹铁道攻略查询插件", "1.0.0")
+@register("astrbot_plugin_Star_Rail", "MskTmi", "崩坏星穹铁道攻略查询插件", "2.7.0")
 class StrategyQuery(Star):
     @filter.command("崩铁查询")
     async def query_strategy(self, event: AstrMessageEvent, *, message: str):
