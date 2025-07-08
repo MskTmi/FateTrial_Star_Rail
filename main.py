@@ -1,14 +1,10 @@
 import json
 import requests
-import os
-import aiohttp
-import asyncio
 import logging
 
 from astrbot.api.event import filter, AstrMessageEvent
-from astrbot.api.star import Context, Star, register
-from astrbot.api.all import *
-from astrbot.api.message_components import *
+from astrbot.api.star import Star, register
+from astrbot.api.message_components import Image, Plain
 
 @register("Star_Rail", "FateTrial", "崩坏星穹铁道攻略查询插件", "1.0.0")
 class StrategyQuery(Star):
@@ -16,103 +12,85 @@ class StrategyQuery(Star):
     async def query_strategy(self, event: AstrMessageEvent, *, message: str):
         yield event.plain_result("正在查询攻略，请稍候...")
 
+        url = f'https://api.yaohud.cn/api/v5/mihoyou/xing?key=SqGWZxWJxEWagRFxkqB&msg={message}'
         try:
-            url = f'https://api.yaohud.cn/api/v5/mihoyou/xing?key=SqGWZxWJxEWagRFxkqB&msg={message}'
             response = requests.post(url, data={'key1': 'value1', 'key2': 'value2'})
-            
             try:
                 result = response.json()
             except json.JSONDecodeError as e:
-                logging.error(f"JSON解析失败: {str(e)}")
+                logging.error(f"JSON 解析失败: {e}")
                 yield event.plain_result(f"数据解析失败，原始响应：\n{response.text}")
                 return
-            
-            image_url = result['picture']
 
+            # 安全获取字段，若缺失则显示 "无"
+            name = result.get('name', '无')
+            icon = result.get('icon', '无')
+            take = result.get('take', '无')
+
+            guangzhui = result.get('guangzhui_tuijian', [])
+            cones = [c.get('name', '无') for c in guangzhui] or ['无']
+
+            rec = result.get('recommendation', {}) or result.get('yq_tuijian', {})
+            early_one = rec.get('one', {}).get('early', '无')
+            early_two = rec.get('two', {}).get('early', '无')
+
+            zhuct = result.get('zhuct') or result.get('zhuangbei_tuijian', {})
+            qu = zhuct.get('qu', '无')
+            jiao = zhuct.get('jiao', '无')
+            wei = zhuct.get('wei', '无')
+            lian = zhuct.get('lian', '无')
+
+            fuct = result.get('fuct', '无')
+            bytion = result.get('bytion', '无')
+            tips = result.get('tips', '无')
+            image_url = result.get('picture')
+
+            teams = []
             if 'ranks1' in result:
-                formatted_msg = f"""
-⭐ 角色攻略：{result['name']} ⭐
+                ranks_keys = ['ranks', 'ranks1']
+            else:
+                ranks_keys = ['peidui_tuijian']
 
-🖼️ 角色简介：
-{result['icon']}
+            for key in ranks_keys:
+                grp = result.get(key, {})
+                name_t = grp.get('name', '无')
+                ids = grp.get('idstext', '无')
+                coll = grp.get('collocation', '无')
+                teams.append((name_t, ids, coll))
 
-🎯 获取途径：{result['take']}
+            content_lines = [
+                f"⭐ 角色攻略：{name} ⭐\n",
+                f"🖼️ 角色简介：\n{icon}\n",
+                f"🎯 获取途径：{take}\n",
+                f"💫 光锥推荐：{' '.join(cones)}\n",
+                f"🔮 遗器推荐：{early_one} + {early_two}\n",
+                "📊 遗器词条：",
+                f"躯干：{qu}",
+                f"脚步：{jiao}",
+                f"位面球：{wei}",
+                f"连接绳：{lian}\n",
+                f"💠 主词条优先级：{fuct}\n",
+                "🤝 配队推荐：\n"
+            ]
 
-💫 光锥推荐：
-{' '.join([cone['name'] for cone in result['guangzhui']])}
+            for idx, (n, ids, coll) in enumerate(teams, start=1):
+                content_lines.append(f"{idx}️⃣ {n}")
+                content_lines.append(f"阵容：{ids}")
+                content_lines.append(f"说明：{coll}\n")
 
-🔮 遗器推荐：
-{result['recommendation']['one']['early']} + {result['recommendation']['two']['early']}
+            content_lines += [
+                f"💡 遗器说明：\n{bytion}\n",
+                f"📝 数据来源：{tips}"
+            ]
 
-📊 遗器词条：
-躯干：{result['zhuct']['qu']}
-脚步：{result['zhuct']['jiao']}
-位面球：{result['zhuct']['wei']}
-连接绳：{result['zhuct']['lian']}
+            formatted_msg = "\n".join(content_lines)
 
-💠 主词条优先级：
-{result['fuct']}
-
-🤝 配队推荐：
-
-1️⃣ {result['ranks']['name']}
-阵容：{result['ranks']['idstext']}
-说明：{result['ranks']['collocation']}
-
-2️⃣ {result['ranks1']['name']}
-阵容：{result['ranks1']['idstext']}
-说明：{result['ranks1']['collocation']}
-
-💡 遗器说明：
-{result['bytion']}
-
-📝 数据来源：{result['tips']}
-"""
-                yield event.chain_result([
-                    Image.fromURL(image_url),
-                    Plain(formatted_msg),
-                ])
-
-            if 'ranks1' not in result:
-                formatted_msg2 = f"""
-⭐ 角色攻略：{result['name']} ⭐
-
-🖼️ 角色简介：
-{result['icon']}
-
-🎯 获取途径：{result['take']}
-
-💫 光锥推荐：
-{' '.join([cone['name'] for cone in result['guangzhui']])}
-
-🔮 遗器推荐：
-{result['recommendation']['one']['early']} + {result['recommendation']['two']['early']}
-
-📊 遗器词条：
-躯干：{result['zhuct']['qu']}
-脚步：{result['zhuct']['jiao']}
-位面球：{result['zhuct']['wei']}
-连接绳：{result['zhuct']['lian']}
-
-💠 主词条优先级：
-{result['fuct']}
-
-🤝 配队推荐：
-
-1️⃣ {result['ranks']['name']}
-阵容：{result['ranks']['idstext']}
-说明：{result['ranks']['collocation']}
-
-💡 遗器说明：
-{result['bytion']}
-
-📝 数据来源：{result['tips']}
-"""
-                yield event.chain_result([
-                    Image.fromURL(image_url),
-                    Plain(formatted_msg2),
-                ])
+            components = []
+            if image_url:
+                components.append(Image.fromURL(image_url))
+            components.append(Plain(formatted_msg))
+            yield event.chain_result(components)
 
         except requests.RequestException as e:
-            logging.error(f"请求失败: {str(e)}")
-            yield event.plain_result(f"网络请求失败，请稍后重试。错误信息：{str(e)}")
+            logging.error(f"请求失败: {e}")
+            yield event.plain_result(f"网络请求失败，请稍后重试。错误信息：{e}")
